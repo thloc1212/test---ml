@@ -16,13 +16,16 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({ features, stepName }
     if (!svgRef.current) return;
 
     const svg = d3.select(svgRef.current);
-    svg.selectAll("*").remove(); // Clear previous render
+    svg.selectAll("*").remove();
 
-    // Add arrow marker for paths
-    svg.append("defs").append("marker")
+    // --- Definitions ---
+    const defs = svg.append("defs");
+    
+    // Arrow marker
+    defs.append("marker")
       .attr("id", "arrowhead")
       .attr("viewBox", "0 -5 10 10")
-      .attr("refX", 25) // Offset from node
+      .attr("refX", 25)
       .attr("refY", 0)
       .attr("markerWidth", 6)
       .attr("markerHeight", 6)
@@ -38,31 +41,30 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({ features, stepName }
     // --- Node Positions ---
     const inputNodes = features.map((f, i) => ({
       id: `input-${f.id}`,
-      x: 100,
+      x: 80,
       y: (height / (features.length + 1)) * (i + 1),
       ...f
     }));
 
     const hiddenNodes = Array.from({ length: 5 }).map((_, i) => ({
       id: `hidden-${i}`,
-      x: 100 + layerSpacing,
+      x: 80 + layerSpacing,
       y: (height / 6) * (i + 1),
     }));
 
     const outputNode = {
       id: 'output',
-      x: 100 + layerSpacing * 2,
+      x: width - 80,
       y: height / 2
     };
 
     const g = svg.append("g");
 
     // --- 1. Skip Connections (Theta) ---
-    // Drawn as curved arches from Input to Output
     const thetaLinks = inputNodes.map(node => {
-      // Control point for Bezier curve to make it arch over hidden layer
       const cpX = (node.x + outputNode.x) / 2;
-      const cpY = node.y - 80; // Arch upwards/downwards depending on position
+      // Arch away from center to avoid crossing hidden layer messily
+      const cpY = node.y < height/2 ? node.y - 100 : node.y + 100;
       
       return {
         source: node,
@@ -73,78 +75,80 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({ features, stepName }
       };
     });
 
-    const thetaPaths = g.append("g").selectAll("path")
+    // Draw Arcs
+    g.append("g").selectAll("path")
       .data(thetaLinks)
       .enter()
       .append("path")
-      .attr("d", d => {
-        return `M${d.source.x},${d.source.y} Q${d.control.x},${d.control.y} ${d.target.x},${d.target.y}`;
-      })
+      .attr("d", d => `M${d.source.x},${d.source.y} Q${d.control.x},${d.control.y} ${d.target.x},${d.target.y}`)
       .attr("fill", "none")
       .attr("stroke", COLOR_THETA)
-      .attr("stroke-width", d => Math.max(1, Math.abs(d.weight) * 10))
-      .attr("stroke-opacity", d => d.active ? 0.8 : 0.1)
+      .attr("stroke-width", d => Math.max(1, Math.abs(d.weight) * 8))
+      .attr("stroke-opacity", d => d.active ? 0.6 : 0.1)
       .attr("stroke-dasharray", d => d.active ? "none" : "5,5");
 
-    // Theta Labels (Values on the curve)
-    g.append("g").selectAll("text")
+    // Theta Labels (Background Box)
+    const thetaLabels = g.append("g").selectAll("g")
       .data(thetaLinks)
       .enter()
-      .append("text")
-      .attr("x", d => d.control.x)
-      .attr("y", d => d.control.y + 10)
-      .text(d => `θ=${d.weight.toFixed(2)}`)
+      .append("g")
+      .attr("transform", d => `translate(${d.control.x}, ${d.control.y})`);
+
+    thetaLabels.append("rect")
+      .attr("x", -25)
+      .attr("y", -10)
+      .attr("width", 50)
+      .attr("height", 20)
+      .attr("rx", 4)
+      .attr("fill", "#0f172a")
+      .attr("stroke", COLOR_THETA)
+      .attr("stroke-width", 1)
+      .attr("opacity", 0.8);
+
+    thetaLabels.append("text")
+      .text(d => d.weight.toFixed(3))
+      .attr("dy", 4)
       .attr("text-anchor", "middle")
       .attr("fill", COLOR_THETA)
-      .attr("font-size", "12px")
-      .attr("font-weight", "bold")
-      .attr("opacity", d => d.active ? 1 : 0.3)
-      .attr("stroke", "#0f172a")
-      .attr("stroke-width", 3)
-      .attr("paint-order", "stroke");
+      .attr("font-size", "11px")
+      .attr("font-family", "monospace")
+      .attr("font-weight", "bold");
 
     // --- 2. Hidden Connections (W) ---
     features.forEach((f, i) => {
       const source = inputNodes[i];
-      
-      // Group for W lines
       const wGroup = g.append("g");
 
       f.w.forEach((wVal, j) => {
         const target = hiddenNodes[j];
-        const isClamped = f.isClamped;
+        const isActive = f.isActive;
         const limit = M_CONSTANT * Math.abs(f.theta);
-        const isMaxed = Math.abs(Math.abs(wVal) - limit) < 0.01 && f.isActive; // Visually check if near limit
+        const isMaxed = Math.abs(Math.abs(wVal) - limit) < 0.01 && isActive;
 
+        // Line
         wGroup.append("line")
           .attr("x1", source.x)
           .attr("y1", source.y)
           .attr("x2", target.x)
           .attr("y2", target.y)
           .attr("stroke", isMaxed ? COLOR_CLAMPED : COLOR_WEIGHT)
-          .attr("stroke-width", Math.max(1, Math.abs(wVal) * 5))
-          .attr("stroke-opacity", f.isActive ? (isMaxed ? 1.0 : 0.4) : 0.05);
-      });
+          .attr("stroke-width", Math.max(0.5, Math.abs(wVal) * 4))
+          .attr("stroke-opacity", isActive ? 0.4 : 0.05);
 
-      // Add visual constraint box near input node
-      if (f.isActive) {
-        const limit = M_CONSTANT * Math.abs(f.theta);
-        g.append("text")
-          .attr("x", source.x + 40)
-          .attr("y", source.y + 25)
-          .text(`|W| ≤ ${limit.toFixed(2)}`)
-          .attr("fill", f.isClamped ? COLOR_CLAMPED : "#64748b")
-          .attr("font-size", "10px")
-          .attr("font-family", "monospace");
-          
-        if (f.isClamped) {
-           g.append("circle")
-            .attr("cx", source.x + 30)
-            .attr("cy", source.y + 22)
-            .attr("r", 3)
-            .attr("fill", COLOR_CLAMPED);
+        // Weight Labels (Only show for first feature or significantly large ones to avoid clutter)
+        if (isActive && Math.abs(wVal) > 0.1 && (i === 0 || j === 2)) {
+             const midX = (source.x + target.x) / 2;
+             const midY = (source.y + target.y) / 2;
+             
+             wGroup.append("text")
+                .attr("x", midX)
+                .attr("y", midY)
+                .text(wVal.toFixed(2))
+                .attr("fill", isMaxed ? COLOR_CLAMPED : "#a855f7")
+                .attr("font-size", "9px")
+                .attr("opacity", 0.8);
         }
-      }
+      });
     });
 
     // --- 3. Hidden to Output ---
@@ -157,7 +161,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({ features, stepName }
         .attr("stroke", "#94a3b8")
         .attr("stroke-width", 1)
         .attr("marker-end", "url(#arrowhead)")
-        .attr("stroke-opacity", 0.3);
+        .attr("stroke-opacity", 0.2);
     });
 
     // --- 4. Nodes ---
@@ -181,7 +185,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({ features, stepName }
       .attr("text-anchor", "middle")
       .attr("fill", "white")
       .style("font-weight", "bold");
-
+      
     // Hidden Nodes
     const hiddens = g.selectAll(".hidden-node")
       .data(hiddenNodes)
@@ -190,7 +194,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({ features, stepName }
       .attr("transform", d => `translate(${d.x},${d.y})`);
 
     hiddens.append("circle")
-      .attr("r", 12)
+      .attr("r", 10)
       .attr("fill", "#334155")
       .attr("stroke", "#94a3b8");
 
@@ -199,23 +203,23 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({ features, stepName }
       .attr("transform", `translate(${outputNode.x},${outputNode.y})`);
 
     output.append("circle")
-      .attr("r", 30)
+      .attr("r", 25)
       .attr("fill", "#f59e0b")
       .attr("stroke", "#fff")
-      .attr("stroke-width", 3);
+      .attr("stroke-width", 2);
       
     output.append("text")
       .text("Y")
       .attr("dy", 5)
       .attr("text-anchor", "middle")
       .attr("fill", "white")
-      .attr("font-weight", "bold")
-      .attr("font-size", "18px");
+      .attr("font-weight", "bold");
 
   }, [features, stepName]);
 
   return (
     <div className="relative bg-slate-900 rounded-lg shadow-xl overflow-hidden border border-slate-700">
+      <div className="absolute top-2 left-2 text-xs text-slate-500 z-10">Visualization of Weights</div>
       <svg 
         ref={svgRef} 
         width={SVG_WIDTH} 
@@ -223,21 +227,6 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({ features, stepName }
         className="w-full h-auto block"
         viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
       />
-      {/* Overlay Legend */}
-      <div className="absolute top-4 left-4 bg-slate-800/80 backdrop-blur p-3 rounded-md border border-slate-700 text-xs text-slate-300 space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
-          <span>Skip Weight (θ)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-purple-500"></span>
-          <span>Hidden Weight (W)</span>
-        </div>
-        <div className="flex items-center gap-2">
-           <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-           <span>Clamped (Hierarchy Active)</span>
-        </div>
-      </div>
     </div>
   );
 };

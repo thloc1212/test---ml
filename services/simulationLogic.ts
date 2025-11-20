@@ -1,79 +1,106 @@
 
-import { WeightData } from "../types";
+import { WeightData, StepCalculationDetails, OptimizationStep } from "../types";
 import { NUM_FEATURES, HIDDEN_SIZE, M_CONSTANT, LEARNING_RATE } from "../constants";
 
-// Initialize weights with a bias: 
-// Feature 1: Strong signal
-// Feature 2: Medium signal
-// Feature 3: Noise (should be pruned first)
 export const initializeWeights = (): WeightData[] => {
   return Array.from({ length: NUM_FEATURES }, (_, i) => {
-    // Bias initialization for educational purpose
-    const startTheta = 1.0 - (i * 0.4); // 1.0, 0.6, 0.2
+    const startTheta = 1.0 - (i * 0.4); 
+    const startW = Array.from({ length: HIDDEN_SIZE }, () => startTheta * 0.5);
     
     return {
       id: i + 1,
       theta: startTheta, 
-      w: Array.from({ length: HIDDEN_SIZE }, () => startTheta * 0.5),
+      w: startW,
       isActive: true,
       isClamped: false,
-      prevTheta: startTheta
+      prevTheta: startTheta,
+      prevW: startW,
+      gradTheta: 0,
+      gradW: Array(HIDDEN_SIZE).fill(0)
     };
   });
 };
 
-// Soft Thresholding Operator (Proximal operator for L1)
 const softThreshold = (x: number, lambda: number): number => {
   if (x > lambda) return x - lambda;
   if (x < -lambda) return x + lambda;
   return 0;
 };
 
-// Simulate a Gradient Descent Step
-export const performGradientStep = (features: WeightData[]): WeightData[] => {
-  return features.map(f => {
+// Returns [NewFeatures, CalculationDetails]
+export const performGradientStep = (features: WeightData[]): { features: WeightData[], details: StepCalculationDetails } => {
+  // Focus detail on Feature 1 for demonstration, or the first active feature
+  let detailObj: StepCalculationDetails = {
+    stepType: OptimizationStep.GRADIENT,
+    featureId: 1,
+  };
+
+  const newFeatures = features.map(f => {
     if (!f.isActive) return f;
 
-    // Deterministic Targets for visualization clarity
-    // Feature 1 -> Target 1.5 (Strong)
-    // Feature 2 -> Target 0.5 (Weak)
-    // Feature 3 -> Target 0.0 (Noise)
+    // 1. Calculate Simulated Gradients
+    // Target values to simulate convergence towards
     let targetTheta = 0;
-    if (f.id === 1) targetTheta = 2.0;
-    else if (f.id === 2) targetTheta = 0.8;
-    else targetTheta = -0.2; // Noise tends to zero or random
+    if (f.id === 1) targetTheta = 1.8;      // Feature 1 stays strong
+    else if (f.id === 2) targetTheta = 0.6; // Feature 2 gets weaker
+    else targetTheta = 0.05;                // Feature 3 (noise) goes to 0
 
-    let targetW = targetTheta * 0.5;
+    const targetW = targetTheta * 0.5;
 
-    // Gradient update: move towards target
-    const newTheta = f.theta - LEARNING_RATE * (f.theta - targetTheta);
-    const newW = f.w.map(wVal => wVal - LEARNING_RATE * (wVal - targetW));
+    // Gradient = (Current - Target) * NoiseFactor
+    const gradTheta = (f.theta - targetTheta); 
+    const gradW = f.w.map(w => (w - targetW));
+
+    // 2. Apply Gradient Descent
+    const newTheta = f.theta - LEARNING_RATE * gradTheta;
+    const newW = f.w.map((w, i) => w - LEARNING_RATE * gradW[i]);
+
+    // Capture details for Feature 1 (or 2 if 1 is dead) for the UI
+    if (f.id === 1 || (f.id === 2 && detailObj.featureId !== 1)) {
+      detailObj = {
+        stepType: OptimizationStep.GRADIENT,
+        featureId: f.id,
+        oldVal: f.theta,
+        grad: gradTheta,
+        learningRate: LEARNING_RATE,
+        newVal: newTheta
+      };
+    }
 
     return {
       ...f,
       prevTheta: f.theta,
+      prevW: f.w,
+      gradTheta,
+      gradW,
       theta: newTheta,
       w: newW,
-      isClamped: false // Reset clamped status on gradient step
+      isClamped: false 
     };
   });
+
+  return { features: newFeatures, details: detailObj };
 };
 
-// Simulate the Proximal Step (Algorithm 2 in LassoNet paper)
-export const performProximalStep = (features: WeightData[], lambda: number): WeightData[] => {
-  return features.map(f => {
+export const performProximalStep = (features: WeightData[], lambda: number): { features: WeightData[], details: StepCalculationDetails } => {
+  let detailObj: StepCalculationDetails = {
+    stepType: OptimizationStep.PROXIMAL,
+    featureId: 1,
+  };
+
+  const newFeatures = features.map(f => {
     const prevTheta = f.theta;
+    const prevW = f.w;
 
-    // 1. Soft thresholding on Theta (Sparsity)
-    // theta_new = sign(theta) * max(|theta| - lambda*eta, 0)
-    let newTheta = softThreshold(f.theta, lambda * LEARNING_RATE);
+    // 1. Soft thresholding on Theta
+    // Effective lambda is lambda * learning_rate in PGD
+    const threshold = lambda * LEARNING_RATE; 
+    let newTheta = softThreshold(f.theta, threshold);
 
-    // Check if feature died (Pruning)
-    const isActive = Math.abs(newTheta) > 1e-3;
+    const isActive = Math.abs(newTheta) > 1e-4;
     if (!isActive) newTheta = 0;
 
     // 2. Hierarchical Projection for W
-    // Constraint: |w_k| <= M * |theta|
     const limit = M_CONSTANT * Math.abs(newTheta);
     
     let isClamped = false;
@@ -81,19 +108,37 @@ export const performProximalStep = (features: WeightData[], lambda: number): Wei
       const absW = Math.abs(wVal);
       if (absW > limit) {
         isClamped = true;
-        // Project onto the box [-limit, limit] (Preserve sign)
         return Math.sign(wVal) * limit;
       }
       return wVal;
     });
 
+    // Capture details for visualization
+    if (f.id === 1 || (f.id === 2 && detailObj.featureId !== 1)) {
+      detailObj = {
+        stepType: OptimizationStep.PROXIMAL,
+        featureId: f.id,
+        inputTheta: f.theta,
+        lambda: threshold,
+        thresholdedTheta: newTheta,
+        inputW: f.w[0], // Just show first W weight for example
+        limit: limit,
+        clampedW: newW[0]
+      };
+    }
+
     return {
       ...f,
-      prevTheta: prevTheta,
+      prevTheta,
+      prevW,
       theta: newTheta,
       w: newW,
       isActive,
-      isClamped
+      isClamped,
+      gradTheta: 0, // Reset gradients for display
+      gradW: f.w.map(() => 0)
     };
   });
+
+  return { features: newFeatures, details: detailObj };
 };
