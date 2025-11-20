@@ -35,7 +35,7 @@ export const Controls: React.FC<ControlsProps> = ({
         } ${isFinished ? 'opacity-50 cursor-not-allowed' : ''}`}
         disabled={isFinished}
       >
-        {isPlaying ? <><Pause size={18} /> Pause</> : <><Play size={18} /> {phase === SimulationPhase.INIT ? 'Start' : 'Play'}</>}
+        {isPlaying ? <><Pause size={18} /> Tạm dừng</> : <><Play size={18} /> {phase === SimulationPhase.INIT ? 'Bắt đầu' : 'Chạy tiếp'}</>}
       </button>
 
       <button
@@ -43,18 +43,18 @@ export const Controls: React.FC<ControlsProps> = ({
         disabled={isPlaying || isFinished}
         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-md transition-colors"
       >
-        <SkipForward size={18} /> Step
+        <SkipForward size={18} /> Bước tiếp
       </button>
 
       <button
         onClick={onReset}
         className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-md transition-colors"
       >
-        <RotateCcw size={18} /> Reset
+        <RotateCcw size={18} /> Đặt lại
       </button>
 
       <div className="flex items-center gap-2 ml-auto border-l border-slate-600 pl-4">
-        <span className="text-slate-400 text-sm flex items-center gap-1"><FastForward size={16} /> Speed</span>
+        <span className="text-slate-400 text-sm flex items-center gap-1"><FastForward size={16} /> Tốc độ</span>
         <input
           type="range"
           min="200"

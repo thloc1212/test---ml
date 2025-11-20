@@ -219,7 +219,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({ features, stepName }
 
   return (
     <div className="relative bg-slate-900 rounded-lg shadow-xl overflow-hidden border border-slate-700">
-      <div className="absolute top-2 left-2 text-xs text-slate-500 z-10">Visualization of Weights</div>
+      <div className="absolute top-2 left-2 text-xs text-slate-500 z-10">Mô phỏng Trọng số</div>
       <svg 
         ref={svgRef} 
         width={SVG_WIDTH} 

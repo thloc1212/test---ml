@@ -30,8 +30,8 @@ const INITIAL_STATE: SimulationState = {
   lambda: 0,
   epoch: 0,
   features: [],
-  logs: ["Ready."],
-  detailedLog: "Press 'Start' or 'Step' to begin.",
+  logs: ["Sẵn sàng."],
+  detailedLog: "Nhấn 'Bắt đầu' hoặc 'Bước tiếp' để chạy mô phỏng.",
   calculationDetails: null
 };
 
@@ -59,8 +59,8 @@ const App: React.FC = () => {
     setState({
       ...INITIAL_STATE,
       features: initializeWeights(),
-      logs: ["Initialized 3 features."],
-      detailedLog: "Initialization: Random weights assigned.",
+      logs: ["Đã khởi tạo 3 đặc trưng."],
+      detailedLog: "Khởi tạo: Gán trọng số ngẫu nhiên cho mạng.",
       calculationDetails: null
     });
     setIsPlaying(false);
@@ -76,7 +76,7 @@ const App: React.FC = () => {
       if (prev.phase === SimulationPhase.INIT) {
         next.phase = SimulationPhase.PRETRAIN;
         next.logs = [...prev.logs, ">>> Pretraining (Lambda = 0)"];
-        next.detailedLog = "Pretraining: Standard Gradient Descent only.";
+        next.detailedLog = "Giai đoạn Pretrain: Chỉ chạy Gradient Descent thông thường để mạng học ổn định trước khi làm thưa.";
         return next;
       }
 
@@ -85,8 +85,8 @@ const App: React.FC = () => {
         next.features = result.features;
         calcDetails = result.details;
         next.step = OptimizationStep.PROXIMAL;
-        stepLog = "Step 1: Gradient Descent (Update Weights)";
-        next.detailedLog = `Gradient Descent: Moving θ and W in direction of steepest descent.`;
+        stepLog = "Bước 1: Gradient Descent (Cập nhật trọng số)";
+        next.detailedLog = `Gradient Descent: Di chuyển θ và W theo hướng đạo hàm để giảm lỗi dự đoán.`;
       } else {
         const result = performProximalStep(prev.features, prev.lambda);
         next.features = result.features;
@@ -94,13 +94,13 @@ const App: React.FC = () => {
         next.step = OptimizationStep.GRADIENT;
         next.epoch += 1;
         
-        stepLog = `Step 2: Proximal (λ=${prev.lambda.toFixed(2)})`;
-        next.detailedLog = `Proximal Step: Applying Sparsity (Soft-Threshold) and Hierarchy (Clamping).`;
+        stepLog = `Bước 2: Proximal (λ=${prev.lambda.toFixed(2)})`;
+        next.detailedLog = `Proximal Step: Áp dụng Soft-Thresholding để làm thưa θ và Ràng buộc Phân cấp (Clamping) lên W.`;
 
         const activePrev = prev.features.filter(f => f.isActive).length;
         const activeNext = next.features.filter(f => f.isActive).length;
         if (activeNext < activePrev) {
-          next.logs = [...next.logs, `⚠️ Feature pruned at λ=${prev.lambda.toFixed(2)}`];
+          next.logs = [...next.logs, `⚠️ Đặc trưng bị loại bỏ tại λ=${prev.lambda.toFixed(2)}`];
         }
       }
 
@@ -109,7 +109,7 @@ const App: React.FC = () => {
           next.phase = SimulationPhase.PATH_LOOP;
           next.epoch = 0;
           next.lambda = LAMBDA_STEP; 
-          next.logs = [...next.logs, `>>> Start Path (λ=${next.lambda})`];
+          next.logs = [...next.logs, `>>> Bắt đầu Path (λ=${next.lambda})`];
         }
       } else if (prev.phase === SimulationPhase.PATH_LOOP) {
         if (next.epoch >= EPOCHS_PER_LAMBDA) {
@@ -118,10 +118,10 @@ const App: React.FC = () => {
           
           if (next.lambda > MAX_LAMBDA) {
             next.phase = SimulationPhase.FINISHED;
-            next.logs = [...next.logs, ">>> Finished"];
+            next.logs = [...next.logs, ">>> Hoàn tất mô phỏng"];
             setIsPlaying(false);
           } else {
-            next.logs = [...next.logs, `λ increased to ${next.lambda}`];
+            next.logs = [...next.logs, `Tăng λ lên ${next.lambda}`];
           }
         }
       }
@@ -155,11 +155,11 @@ const App: React.FC = () => {
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             <Brain className="text-emerald-400" size={24} />
-            LassoNet Visualizer
+            Mô phỏng LassoNet
           </h1>
         </div>
         <div className="text-xs text-slate-500 font-mono">
-          Alg 2: Prox-Linear Optimization
+          Thuật toán 2: Tối ưu hóa Prox-Linear
         </div>
       </header>
 
@@ -192,7 +192,7 @@ const App: React.FC = () => {
              {/* Explanation Box */}
              <div className="flex-1 bg-slate-900 p-4 rounded-lg border border-slate-800 overflow-y-auto">
                 <div className="flex items-center gap-2 mb-1 uppercase tracking-wider text-[10px] font-bold text-slate-500">
-                  <Activity size={12} /> System Status
+                  <Activity size={12} /> Trạng thái hệ thống
                 </div>
                 <p className="text-slate-300 text-sm leading-relaxed">
                   {state.detailedLog}
@@ -200,7 +200,7 @@ const App: React.FC = () => {
                 <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-400 font-mono">
                   <div>Epoch: <span className="text-white">{state.epoch}</span></div>
                   <div>Lambda: <span className="text-emerald-400">{state.lambda.toFixed(2)}</span></div>
-                  <div>Active: <span className="text-blue-400">{activeCount}</span></div>
+                  <div>Hoạt động: <span className="text-blue-400">{activeCount}</span></div>
                 </div>
              </div>
 
@@ -223,18 +223,18 @@ const App: React.FC = () => {
           <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 flex-shrink-0">
             <div className="flex justify-between items-center mb-2">
               <h3 className="font-bold text-indigo-300 text-xs flex items-center gap-2">
-                Gemini Analysis
+                Phân tích AI (Gemini)
               </h3>
               <button 
                 onClick={handleAiAnalysis}
                 disabled={isAnalyzing}
                 className="text-[10px] uppercase font-bold bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded"
               >
-                {isAnalyzing ? '...' : 'Ask AI'}
+                {isAnalyzing ? '...' : 'Hỏi AI'}
               </button>
             </div>
             <div className="text-xs text-slate-400 min-h-[60px] max-h-[100px] overflow-y-auto">
-               {aiAnalysis || "Click to analyze sparsity."}
+               {aiAnalysis || "Nhấn 'Hỏi AI' để phân tích trạng thái mạng."}
             </div>
           </div>
         </div>

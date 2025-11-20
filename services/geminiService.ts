@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { SimulationState, WeightData } from "../types";
 
@@ -7,7 +8,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzeLassoNetState = async (state: SimulationState): Promise<string> => {
   if (!process.env.API_KEY) {
-    return "Gemini API Key is missing. Please configure process.env.API_KEY to enable AI analysis.";
+    return "Vui lòng cấu hình process.env.API_KEY để sử dụng AI phân tích.";
   }
 
   const featureSummary = state.features.map(f => 
@@ -15,21 +16,22 @@ export const analyzeLassoNetState = async (state: SimulationState): Promise<stri
   ).join('\n');
 
   const prompt = `
-    You are an expert in Machine Learning and specifically the LassoNet architecture.
-    Analyze the current training state of a LassoNet visualization.
+    Bạn là một chuyên gia về Học máy (Machine Learning) và đặc biệt là kiến trúc LassoNet.
+    Hãy phân tích trạng thái huấn luyện hiện tại của mô hình LassoNet đang được hiển thị.
     
-    Context:
-    - Phase: ${state.phase}
-    - Current Lambda (Penalty): ${state.lambda.toFixed(3)}
+    Bối cảnh:
+    - Giai đoạn (Phase): ${state.phase}
+    - Lambda hiện tại (Hệ số phạt): ${state.lambda.toFixed(3)}
     - Epoch: ${state.epoch}
-    - Step Type: ${state.step}
+    - Bước tối ưu (Step Type): ${state.step}
     
-    Feature Weights:
+    Trọng số đặc trưng (Feature Weights):
     ${featureSummary}
     
-    Explain briefly (max 2 sentences) what is happening regarding feature selection. 
-    Which features are being pruned (theta approaching 0)? 
-    Is the hierarchy constraint ( |W| <= M*|theta| ) visible?
+    Hãy giải thích ngắn gọn bằng TIẾNG VIỆT (tối đa 2 câu):
+    Điều gì đang xảy ra với việc lựa chọn đặc trưng? 
+    Đặc trưng nào đang bị loại bỏ (theta tiến về 0)? 
+    Ràng buộc phân cấp ( |W| <= M*|theta| ) có đang hoạt động không?
   `;
 
   try {
@@ -37,9 +39,9 @@ export const analyzeLassoNetState = async (state: SimulationState): Promise<stri
       model: 'gemini-2.5-flash',
       contents: prompt,
     });
-    return response.text || "No analysis generated.";
+    return response.text || "Không có phân tích nào được tạo.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Unable to fetch analysis from Gemini at this moment.";
+    return "Không thể lấy phân tích từ Gemini lúc này.";
   }
 };
