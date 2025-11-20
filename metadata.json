@@ -1,0 +1,5 @@
+{
+  "name": "Copy of LassoNet Visualizer",
+  "description": "Interactive visualization of the LassoNet algorithm showing feature sparsity and hierarchical constraints in neural networks.",
+  "requestFramePermissions": []
+}
